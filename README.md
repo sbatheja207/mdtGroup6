@@ -28,9 +28,9 @@ For npm cache permission errors, use `npm ci --cache .npm-cache` and add `.npm-c
 
 - Responsive sidebar/workspace and three-step insurance intake.
 - Multiple card images (front/back) and PDF plan documents; up to six files, 10 MB each.
-- English image OCR using Tesseract.js, on the user's device. The first image read downloads OCR worker/core/language assets from the library's default CDNs; it requires internet access. Images are not submitted to an OCR API.
+- English image OCR using Tesseract.js, on the user's device. Card images are resized to at most 2400 pixels on their longest side and read with sparse-text segmentation to support multi-column layouts. The first image read downloads OCR worker/core/language assets from the library's default CDNs; it requires internet access. Images are not submitted to an OCR API.
 - Text extraction from text-based PDFs using PDF.js, up to 100 pages per PDF. Scanned PDFs are retained but clearly flagged for manual entry; PDF OCR is not implemented.
-- Conservative suggestions for labeled member ID, group/policy number, insurer, plan name, and member name. Blank fields stay blank when no match exists. Suggestions only fill blank fields and must be reviewed. Removing a document does not erase previously suggested fields; correct them on the details step.
+- Conservative suggestions for member ID (including bare `ID` and spaced values), group/policy number, recognized insurer names, plan name, and next-line member names. Suggested fields are marked in the form. GHP is treated as a group-number candidate and must be checked against the plan. For multiple members, the first name is suggested and must be reviewed. Blank fields stay blank when no match exists. Suggestions only fill blank fields and must be reviewed. Removing a document does not erase previously suggested fields; correct them on the details step.
 - Manual entry for insurer, plan name, name on card, member ID, group/policy number, plan type, network, and coverage dates. Insurer and member ID are required; group and policy number are optional because not every plan supplies them.
 - IndexedDB persistence of one reviewed profile, original file blobs, and extracted text. Edit, reload, and delete are supported. Unsaved changes are held in memory and lost on reload.
 - Clearly labeled future modules for chat, cost estimates, and bill review.
@@ -99,3 +99,9 @@ No Gemini or OpenRouter models are connected. Add model calls behind an authenti
 - [Tesseract.js worker API](https://github.com/naptha/tesseract.js/blob/master/docs/api.md)
 - [PDF.js examples](https://mozilla.github.io/pdf.js/examples/index.html)
 - [Vite guide](https://vite.dev/guide/)
+
+## Verified card-upload demo
+
+The supplied fictional Aetna card was uploaded through the browser UI. OCR and the details form were checked end to end: insurer `Aetna`, member `Jane Doe`, member ID `W123456789`, GHP/group candidate `000000-000-00000`, and plan `Managed Choice Open Access AMF Aexcel Plus` were prefilled. Unsupported fields stayed blank. Automated regression tests cover that OCR layout, missing values, next-line IDs, and avoiding pharmacy/issuer-number confusion. The source images remain local and are not committed.
+
+This is heuristic extraction, not a guarantee for every insurer or photo quality. Always review suggestions. Existing entered values are preserved; adding a new card does not silently replace them.

@@ -6,3 +6,6 @@ dist/
 coverage/
 *.local
 .npm-cache/
+
+# Local upload examples; never publish insurance card images.
+/exampleInsuranceCard*.png
