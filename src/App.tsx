@@ -32,6 +32,7 @@ import {
 } from "./lib/plan";
 import { deleteProfile, loadProfile, saveProfile } from "./lib/storage";
 import { extractDocument, MAX_FILES, validateFile } from "./lib/extract";
+import { CostEstimator } from "./features/CostEstimator";
 
 type Page = "plan" | "chat" | "cost" | "bill";
 const fields: {
@@ -311,7 +312,6 @@ export default function App() {
           >
             <Calculator size={19} />
             Estimate a cost
-            <span className="soon-dot" />
           </button>
           <p className="nav-label">DURING & AFTER CARE</p>
           <button
@@ -416,6 +416,11 @@ export default function App() {
           )}
           {loading ? (
             <div className="panel loading">Loading your workspace…</div>
+          ) : page === "cost" ? (
+            <CostEstimator
+              profile={profile}
+              onBack={() => navigate("plan")}
+            />
           ) : selectedModule ? (
             <section className="panel coming-soon">
               <selectedModule.icon size={36} />

@@ -1,0 +1,331 @@
+import type {
+  CareSetting,
+  GeoBucket,
+  PlanBenefitTemplate,
+  Procedure,
+} from "./types";
+
+export const SETTING_LABELS: Record<CareSetting, string> = {
+  office: "Doctor’s office",
+  imagingCenter: "Independent imaging or lab",
+  ambulatorySurgery: "Ambulatory surgery center",
+  outpatientHospital: "Hospital outpatient department",
+  emergency: "Emergency department",
+};
+
+/** Relative to an office / independent setting. */
+export const SETTING_MULTIPLIER: Record<CareSetting, number> = {
+  office: 1,
+  imagingCenter: 1.05,
+  ambulatorySurgery: 1.4,
+  outpatientHospital: 2.15,
+  emergency: 2.45,
+};
+
+export const PROCEDURES: Procedure[] = [
+  {
+    id: "office-visit-est",
+    displayName: "Office visit (established patient)",
+    cptCode: "99213",
+    aliases: ["checkup", "primary care", "doctor visit", "sick visit"],
+    serviceClass: "officeVisit",
+    defaultSetting: "office",
+    allowedTypical: { p25: 95, p50: 128, p75: 175 },
+  },
+  {
+    id: "preventive-physical",
+    displayName: "Annual physical / preventive visit",
+    cptCode: "99395",
+    aliases: ["wellness visit", "physical exam", "annual exam"],
+    serviceClass: "preventive",
+    defaultSetting: "office",
+    allowedTypical: { p25: 140, p50: 190, p75: 260 },
+  },
+  {
+    id: "mri-knee",
+    displayName: "MRI of the knee (no contrast)",
+    cptCode: "73721",
+    aliases: ["knee mri", "mri knee"],
+    serviceClass: "imaging",
+    defaultSetting: "imagingCenter",
+    allowedTypical: { p25: 380, p50: 620, p75: 980 },
+  },
+  {
+    id: "mri-brain",
+    displayName: "MRI of the brain (no contrast)",
+    cptCode: "70551",
+    aliases: ["brain mri", "head mri"],
+    serviceClass: "imaging",
+    defaultSetting: "imagingCenter",
+    allowedTypical: { p25: 420, p50: 700, p75: 1150 },
+  },
+  {
+    id: "ct-abdomen",
+    displayName: "CT of abdomen and pelvis with contrast",
+    cptCode: "74177",
+    aliases: ["ct scan", "abdominal ct"],
+    serviceClass: "imaging",
+    defaultSetting: "outpatientHospital",
+    allowedTypical: { p25: 520, p50: 890, p75: 1450 },
+  },
+  {
+    id: "chest-xray",
+    displayName: "Chest X-ray (2 views)",
+    cptCode: "71046",
+    aliases: ["xray", "x-ray", "chest x ray"],
+    serviceClass: "imaging",
+    defaultSetting: "imagingCenter",
+    allowedTypical: { p25: 45, p50: 78, p75: 140 },
+  },
+  {
+    id: "mammogram",
+    displayName: "Screening mammogram",
+    cptCode: "77067",
+    aliases: ["mammography", "breast screening"],
+    serviceClass: "preventive",
+    defaultSetting: "imagingCenter",
+    allowedTypical: { p25: 160, p50: 240, p75: 380 },
+  },
+  {
+    id: "colonoscopy-screening",
+    displayName: "Screening colonoscopy",
+    cptCode: "45378",
+    aliases: ["colonoscopy", "colon screening"],
+    serviceClass: "preventive",
+    defaultSetting: "ambulatorySurgery",
+    allowedTypical: { p25: 980, p50: 1650, p75: 2800 },
+  },
+  {
+    id: "ed-moderate",
+    displayName: "Emergency department visit (moderate)",
+    cptCode: "99284",
+    aliases: ["er visit", "ed visit", "emergency room"],
+    serviceClass: "emergency",
+    defaultSetting: "emergency",
+    allowedTypical: { p25: 720, p50: 1280, p75: 2100 },
+  },
+  {
+    id: "cbc",
+    displayName: "Complete blood count (CBC)",
+    cptCode: "85025",
+    aliases: ["blood test", "bloodwork", "lab work"],
+    serviceClass: "lab",
+    defaultSetting: "office",
+    allowedTypical: { p25: 12, p50: 22, p75: 48 },
+  },
+  {
+    id: "pt-eval",
+    displayName: "Physical therapy evaluation",
+    cptCode: "97161",
+    aliases: ["pt eval", "physio", "physical therapy"],
+    serviceClass: "officeVisit",
+    defaultSetting: "office",
+    allowedTypical: { p25: 95, p50: 145, p75: 210 },
+  },
+  {
+    id: "skin-biopsy",
+    displayName: "Skin biopsy",
+    cptCode: "11102",
+    aliases: ["biopsy", "dermatology biopsy"],
+    serviceClass: "procedure",
+    defaultSetting: "office",
+    allowedTypical: { p25: 140, p50: 230, p75: 390 },
+  },
+  {
+    id: "knee-arthroscopy",
+    displayName: "Knee arthroscopy",
+    cptCode: "29881",
+    aliases: ["knee surgery", "arthroscopy"],
+    serviceClass: "procedure",
+    defaultSetting: "ambulatorySurgery",
+    allowedTypical: { p25: 3200, p50: 5400, p75: 8600 },
+  },
+];
+
+export const GEOS: GeoBucket[] = [
+  {
+    id: "large-metro",
+    label: "Large metro (higher typical prices)",
+    aliases: [
+      "new york",
+      "nyc",
+      "brooklyn",
+      "manhattan",
+      "boston",
+      "san francisco",
+      "sf",
+      "los angeles",
+      "la",
+    ],
+    zipPrefixes: ["100", "101", "112", "021", "941", "900", "902"],
+    multiplier: 1.28,
+  },
+  {
+    id: "lower-cost",
+    label: "Lower-cost / rural area",
+    aliases: ["rural", "montana", "billings", "alaska", "fairbanks"],
+    zipPrefixes: ["590", "591", "597", "997"],
+    multiplier: 0.78,
+  },
+  {
+    id: "typical",
+    label: "Typical U.S. metro",
+    aliases: [
+      "pittsburgh",
+      "chicago",
+      "atlanta",
+      "dallas",
+      "columbus",
+      "typical",
+    ],
+    zipPrefixes: ["152", "606", "303", "752", "432"],
+    multiplier: 1,
+  },
+];
+
+const ppoClasses: PlanBenefitTemplate["classes"] = {
+  preventive: { kind: "free", subjectToDeductible: false },
+  officeVisit: { kind: "copay", copay: 30, subjectToDeductible: false },
+  imaging: {
+    kind: "coinsurance",
+    coinsuranceRate: 0.2,
+    subjectToDeductible: true,
+  },
+  procedure: {
+    kind: "coinsurance",
+    coinsuranceRate: 0.2,
+    subjectToDeductible: true,
+  },
+  emergency: { kind: "copay", copay: 250, subjectToDeductible: true },
+  lab: {
+    kind: "coinsurance",
+    coinsuranceRate: 0.2,
+    subjectToDeductible: true,
+  },
+};
+
+export const BENEFIT_TEMPLATES: PlanBenefitTemplate[] = [
+  {
+    id: "campus-care-plus",
+    label: "Campus Care Plus (demo PPO template)",
+    insurerIncludes: ["example health"],
+    planNameIncludes: ["campus care"],
+    planTypes: ["PPO"],
+    annualDeductible: 1500,
+    annualOopMax: 6000,
+    classes: {
+      ...ppoClasses,
+      officeVisit: { kind: "copay", copay: 25, subjectToDeductible: false },
+      emergency: { kind: "copay", copay: 150, subjectToDeductible: true },
+    },
+  },
+  {
+    id: "aetna-ppo",
+    label: "Aetna PPO template (demo)",
+    insurerIncludes: ["aetna"],
+    planTypes: ["PPO"],
+    annualDeductible: 1500,
+    annualOopMax: 6500,
+    classes: ppoClasses,
+  },
+  {
+    id: "cigna-hmo",
+    label: "Cigna HMO template (demo)",
+    insurerIncludes: ["cigna"],
+    planTypes: ["HMO"],
+    annualDeductible: 500,
+    annualOopMax: 4000,
+    classes: {
+      preventive: { kind: "free", subjectToDeductible: false },
+      officeVisit: { kind: "copay", copay: 20, subjectToDeductible: false },
+      imaging: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.1,
+        subjectToDeductible: true,
+      },
+      procedure: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.1,
+        subjectToDeductible: true,
+      },
+      emergency: { kind: "copay", copay: 150, subjectToDeductible: true },
+      lab: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.1,
+        subjectToDeductible: true,
+      },
+    },
+  },
+  {
+    id: "generic-hdhp",
+    label: "Generic HDHP template (demo)",
+    planTypes: ["HDHP"],
+    annualDeductible: 3200,
+    annualOopMax: 7500,
+    classes: {
+      preventive: { kind: "free", subjectToDeductible: false },
+      officeVisit: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.2,
+        subjectToDeductible: true,
+      },
+      imaging: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.2,
+        subjectToDeductible: true,
+      },
+      procedure: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.2,
+        subjectToDeductible: true,
+      },
+      emergency: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.2,
+        subjectToDeductible: true,
+      },
+      lab: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.2,
+        subjectToDeductible: true,
+      },
+    },
+  },
+  {
+    id: "generic-hmo",
+    label: "Generic HMO template (demo)",
+    planTypes: ["HMO"],
+    annualDeductible: 750,
+    annualOopMax: 4500,
+    classes: {
+      preventive: { kind: "free", subjectToDeductible: false },
+      officeVisit: { kind: "copay", copay: 25, subjectToDeductible: false },
+      imaging: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.1,
+        subjectToDeductible: true,
+      },
+      procedure: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.1,
+        subjectToDeductible: true,
+      },
+      emergency: { kind: "copay", copay: 200, subjectToDeductible: true },
+      lab: {
+        kind: "coinsurance",
+        coinsuranceRate: 0.1,
+        subjectToDeductible: true,
+      },
+    },
+  },
+  {
+    id: "generic-ppo",
+    label: "Generic PPO template (demo)",
+    planTypes: ["PPO", "EPO", "POS"],
+    annualDeductible: 1500,
+    annualOopMax: 6000,
+    classes: ppoClasses,
+  },
+];
+
+export const GENERIC_PPO = BENEFIT_TEMPLATES.find((t) => t.id === "generic-ppo")!;
