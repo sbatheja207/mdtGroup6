@@ -4,6 +4,7 @@ import type { PlanProfile } from "../lib/plan";
 import {
   estimateCost,
   parseOptionalMoney,
+  parseOptionalPercent,
   PROCEDURES,
   searchProcedures,
   SETTING_LABELS,
@@ -13,6 +14,23 @@ import {
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+type HospitalSearchResult = {
+  hospitalId: string;
+  hospitalName: string;
+  location: string;
+  procedureCode: string;
+  procedureDescription: string;
+  payer: string;
+  planName: string;
+  network: "in" | "out";
+  grossCharge: number | null;
+  cashPrice: number | null;
+  negotiatedAmount: number | null;
+  setting: "inpatient" | "outpatient";
+  sourceUrl: string;
+  lastUpdated: string | null;
+};
 
 export function CostEstimator({
   profile,
@@ -52,21 +70,40 @@ function CostEstimatorForm({
   const [procedureId, setProcedureId] = useState("");
   const [location, setLocation] = useState("");
   const [setting, setSetting] = useState<CareSetting | "">("");
+  const [annualDeductible, setAnnualDeductible] = useState("");
+  const [annualOopMax, setAnnualOopMax] = useState("");
+  const [copay, setCopay] = useState("");
+  const [coinsurance, setCoinsurance] = useState("");
   const [remainingDeductible, setRemainingDeductible] = useState("");
   const [remainingOop, setRemainingOop] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<CostEstimate>();
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [searchSummary, setSearchSummary] = useState("");
+  const [hospitals, setHospitals] = useState<HospitalSearchResult[]>([]);
 
   const matches = useMemo(() => searchProcedures(query), [query]);
   const selected = PROCEDURES.find((p) => p.id === procedureId);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
     const deductible = parseOptionalMoney(remainingDeductible);
     const oop = parseOptionalMoney(remainingOop);
-    if (deductible.error || oop.error) {
-      setError(deductible.error || oop.error || "");
+    const annualDeductibleValue = parseOptionalMoney(annualDeductible);
+    const annualOopValue = parseOptionalMoney(annualOopMax);
+    const copayValue = parseOptionalMoney(copay);
+    const coinsuranceValue = parseOptionalPercent(coinsurance);
+    const inputError =
+      deductible.error ||
+      oop.error ||
+      annualDeductibleValue.error ||
+      annualOopValue.error ||
+      copayValue.error ||
+      coinsuranceValue.error;
+    if (inputError) {
+      setError(inputError);
       setResult(undefined);
       return;
     }
@@ -88,6 +125,18 @@ function CostEstimatorForm({
       setting: setting || undefined,
       remainingDeductible: deductible.value,
       remainingOop: oop.value,
+      benefitOverrides:
+        annualDeductibleValue.value !== undefined ||
+        annualOopValue.value !== undefined ||
+        copayValue.value !== undefined ||
+        coinsuranceValue.value !== undefined
+          ? {
+              annualDeductible: annualDeductibleValue.value,
+              annualOopMax: annualOopValue.value,
+              copay: copayValue.value,
+              coinsuranceRate: coinsuranceValue.value,
+            }
+          : undefined,
     });
     if (!estimated.ok) {
       setError(estimated.error);
@@ -96,6 +145,53 @@ function CostEstimatorForm({
     }
     setProcedureId(chosen);
     setResult(estimated);
+
+    setSearchError("");
+    setSearchSummary("");
+    setHospitals([]);
+    if (!location.trim()) {
+      setSearchError("Enter a city or ZIP to search for sourced hospital prices.");
+      return;
+    }
+
+    const procedure = PROCEDURES.find((p) => p.id === chosen);
+    if (!procedure) return;
+    setSearching(true);
+    try {
+      const response = await fetch("/api/cost-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          procedureName: procedure.displayName,
+          cptCode: procedure.cptCode,
+          location: location.trim(),
+          payer: profile.details.insurer,
+          planName: profile.details.planName,
+          planType: profile.details.planType,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Hospital search failed.");
+      setHospitals(Array.isArray(payload.hospitals) ? payload.hospitals : []);
+      setSearchSummary(
+        typeof payload.summary === "string"
+          ? payload.summary
+          : "",
+      );
+      if (!Array.isArray(payload.hospitals) || payload.hospitals.length === 0) {
+        setSearchError(
+          "No reliably sourced negotiated prices were found. The demo estimate remains available above.",
+        );
+      }
+    } catch (caught) {
+      setSearchError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not complete the sourced hospital search.",
+      );
+    } finally {
+      setSearching(false);
+    }
   }
 
   return (
@@ -191,6 +287,58 @@ function CostEstimatorForm({
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              Annual deductible (optional)
+              <input
+                inputMode="decimal"
+                value={annualDeductible}
+                onChange={(e) => {
+                  setAnnualDeductible(e.target.value);
+                  setResult(undefined);
+                }}
+                placeholder="e.g. 1500"
+              />
+              <small>Replaces the demo plan’s deductible when entered.</small>
+            </label>
+            <label>
+              Annual out-of-pocket max (optional)
+              <input
+                inputMode="decimal"
+                value={annualOopMax}
+                onChange={(e) => {
+                  setAnnualOopMax(e.target.value);
+                  setResult(undefined);
+                }}
+                placeholder="e.g. 6000"
+              />
+              <small>Replaces the demo plan’s annual maximum.</small>
+            </label>
+            <label>
+              Copay (optional)
+              <input
+                inputMode="decimal"
+                value={copay}
+                onChange={(e) => {
+                  setCopay(e.target.value);
+                  setResult(undefined);
+                }}
+                placeholder="e.g. 50"
+              />
+              <small>Use when your plan specifies a flat procedure copay.</small>
+            </label>
+            <label>
+              Coinsurance (optional)
+              <input
+                inputMode="decimal"
+                value={coinsurance}
+                onChange={(e) => {
+                  setCoinsurance(e.target.value);
+                  setResult(undefined);
+                }}
+                placeholder="e.g. 20%"
+              />
+              <small>Percentage paid by you after the deductible.</small>
             </label>
             <label>
               Remaining deductible (optional)
@@ -290,6 +438,68 @@ function CostEstimatorForm({
               <li key={line}>{line}</li>
             ))}
           </ul>
+        </section>
+      )}
+      {(searching || searchError || searchSummary || hospitals.length > 0) && (
+        <section className="panel cost-panel hospital-search" aria-live="polite">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">LIVE PUBLIC-PRICE SEARCH</div>
+              <h2>Hospital pricing sources</h2>
+            </div>
+            {searching && <span className="saved-badge">Searching…</span>}
+          </div>
+          {searchSummary && <p className="cost-template">{searchSummary}</p>}
+          {searchError && (
+            <div role="status" className="context-note cost-disclaimer">
+              {searchError}
+            </div>
+          )}
+          {hospitals.length > 0 && (
+            <div className="hospital-results">
+              {hospitals.map((hospital) => (
+                <article className="hospital-card" key={hospital.hospitalId}>
+                  <div>
+                    <span className="hospital-network">
+                      {hospital.network === "in" ? "In-network evidence" : "Network unclear"}
+                    </span>
+                    <h3>{hospital.hospitalName}</h3>
+                    <p>{hospital.location}</p>
+                  </div>
+                  <strong className="hospital-price">
+                    {hospital.negotiatedAmount === null
+                      ? "Price unavailable"
+                      : money(hospital.negotiatedAmount)}
+                  </strong>
+                  <dl>
+                    {hospital.grossCharge !== null && (
+                      <>
+                        <dt>Gross charge</dt>
+                        <dd>{money(hospital.grossCharge)}</dd>
+                      </>
+                    )}
+                    {hospital.cashPrice !== null && (
+                      <>
+                        <dt>Cash price</dt>
+                        <dd>{money(hospital.cashPrice)}</dd>
+                      </>
+                    )}
+                    <dt>Setting</dt>
+                    <dd>{hospital.setting}</dd>
+                    {hospital.lastUpdated && (
+                      <>
+                        <dt>Last updated</dt>
+                        <dd>{hospital.lastUpdated}</dd>
+                      </>
+                    )}
+                  </dl>
+                  <a href={hospital.sourceUrl} target="_blank" rel="noreferrer">
+                    View source
+                  </a>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       )}
     </div>

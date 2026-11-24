@@ -20,7 +20,14 @@ import type {
 } from "./types";
 
 export { PROCEDURES, GEOS, SETTING_LABELS } from "./catalog";
-export type { CareSetting, CostEstimate, CostEstimateResult } from "./types";
+export type {
+  BenefitOverrides,
+  CareSetting,
+  CostEstimate,
+  CostEstimateResult,
+  PlanBenefits,
+  ProcedurePrice,
+} from "./types";
 
 const roundMoney = (n: number) => Math.round(n * 100) / 100;
 
@@ -137,8 +144,15 @@ export function patientShare(
     const afterDeductible = Math.max(0, allowed - appliedToDeductible);
     if (rule.kind === "copay") {
       if (afterDeductible > 0) copay = rule.copay;
+    } else if (rule.kind === "copayAndCoinsurance") {
+      if (afterDeductible > 0) {
+        copay = rule.copay;
+        coinsurance = afterDeductible * rule.coinsuranceRate;
+      }
     } else {
-      coinsurance = afterDeductible * rule.coinsuranceRate;
+      if (rule.kind === "coinsurance") {
+        coinsurance = afterDeductible * rule.coinsuranceRate;
+      }
     }
   }
 
@@ -171,7 +185,67 @@ export function estimateCost(request: EstimateRequest): CostEstimateResult {
 
   const setting = request.setting ?? procedure.defaultSetting;
   const { geo, assumed: geoAssumed } = matchGeo(request.locationQuery);
-  const { benefits, source } = resolveBenefits(request.profile.details);
+  const resolved = resolveBenefits(request.profile.details);
+  const source = resolved.source;
+  const benefits: PlanBenefitTemplate = request.benefitOverrides
+    ? {
+        ...resolved.benefits,
+        id: `${resolved.benefits.id}-custom`,
+        label: `${resolved.benefits.label} (user-entered overrides)`,
+        annualDeductible:
+          request.benefitOverrides.annualDeductible ??
+          resolved.benefits.annualDeductible,
+        annualOopMax:
+          request.benefitOverrides.annualOopMax ??
+          resolved.benefits.annualOopMax,
+        classes: { ...resolved.benefits.classes },
+      }
+    : resolved.benefits;
+
+  const overrides = request.benefitOverrides;
+  if (overrides?.copay !== undefined || overrides?.coinsuranceRate !== undefined) {
+    for (const serviceClass of Object.keys(benefits.classes) as (keyof typeof benefits.classes)[]) {
+      if (serviceClass === "preventive") continue;
+      const rule = benefits.classes[serviceClass];
+      const subjectToDeductible =
+        rule.kind === "copay" || rule.kind === "copayAndCoinsurance"
+          ? rule.subjectToDeductible
+          : rule.kind === "coinsurance"
+            ? rule.subjectToDeductible
+            : true;
+      const existingCopay =
+        rule.kind === "copay" || rule.kind === "copayAndCoinsurance"
+          ? rule.copay
+          : 0;
+      const existingCoinsurance =
+        rule.kind === "coinsurance" || rule.kind === "copayAndCoinsurance"
+          ? rule.coinsuranceRate
+          : 0;
+      const copay = overrides.copay ?? existingCopay;
+      const coinsuranceRate =
+        overrides.coinsuranceRate ?? existingCoinsurance;
+      if (copay > 0 && coinsuranceRate > 0) {
+        benefits.classes[serviceClass] = {
+          kind: "copayAndCoinsurance",
+          copay,
+          coinsuranceRate,
+          subjectToDeductible,
+        };
+      } else if (copay > 0) {
+        benefits.classes[serviceClass] = {
+          kind: "copay",
+          copay,
+          subjectToDeductible,
+        };
+      } else if (coinsuranceRate > 0) {
+        benefits.classes[serviceClass] = {
+          kind: "coinsurance",
+          coinsuranceRate,
+          subjectToDeductible,
+        };
+      }
+    }
+  }
   const allowed = allowedFor(procedure, geo, setting);
   const rule = benefits.classes[procedure.serviceClass];
 
@@ -273,4 +347,17 @@ export function parseOptionalMoney(raw: string): {
     return { error: "Enter a dollar amount of 0 or more, or leave the field blank." };
   }
   return { value: roundMoney(n) };
+}
+
+export function parseOptionalPercent(raw: string): {
+  value?: number;
+  error?: string;
+} {
+  const trimmed = raw.trim().replace(/%$/, "");
+  if (!trimmed) return {};
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0 || n > 100) {
+    return { error: "Enter a coinsurance percentage from 0 to 100, or leave the field blank." };
+  }
+  return { value: roundMoney(n / 100) };
 }

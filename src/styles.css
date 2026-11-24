@@ -2469,8 +2469,64 @@ footer button {
   align-items: flex-start;
   margin-bottom: 22px;
 }
+.hospital-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+.hospital-card {
+  border: 1px solid #dfe6da;
+  border-radius: 9px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.hospital-card h3 {
+  margin-top: 6px;
+  font-size: 14px;
+}
+.hospital-card p {
+  color: #879680;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.hospital-network {
+  color: #6d8662;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.hospital-price {
+  color: #255e4d;
+  font-size: 20px;
+  font-family: "Manrope", sans-serif;
+}
+.hospital-card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  font-size: 10px;
+}
+.hospital-card dt {
+  color: #879680;
+}
+.hospital-card dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+.hospital-card a {
+  color: #356c50;
+  font-size: 11px;
+  font-weight: 600;
+}
 @media (max-width: 720px) {
   .cost-suggestions {
+    grid-template-columns: 1fr;
+  }
+  .hospital-results {
     grid-template-columns: 1fr;
   }
   .cost-panel {

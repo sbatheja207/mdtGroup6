@@ -9,6 +9,7 @@ import {
   patientShare,
   resolveBenefits,
   searchProcedures,
+  parseOptionalPercent,
 } from "./estimate";
 
 const profile = (details = demoDetails): PlanProfile => ({
@@ -108,6 +109,22 @@ describe("patientShare", () => {
     expect(patientShare(400, 1500, 6000, ed).patientPay).toBe(400);
     expect(patientShare(1280, 0, 6000, ed).patientPay).toBe(150);
   });
+
+  it("combines deductible, coinsurance, and copay", () => {
+    const combined = {
+      kind: "copayAndCoinsurance" as const,
+      copay: 50,
+      coinsuranceRate: 0.2,
+      subjectToDeductible: true,
+    };
+    expect(patientShare(1000, 500, 6000, combined)).toEqual({
+      allowed: 1000,
+      appliedToDeductible: 500,
+      copay: 50,
+      coinsurance: 100,
+      patientPay: 650,
+    });
+  });
 });
 
 describe("estimateCost", () => {
@@ -180,6 +197,25 @@ describe("estimateCost", () => {
     );
     expect(metro.p50).toBeGreaterThan(typical.p50);
   });
+
+  it("uses user-entered annual benefit overrides", () => {
+    const result = estimateCost({
+      profile: profile(),
+      procedureId: "mri-knee",
+      locationQuery: "Pittsburgh",
+      remainingDeductible: 0,
+      remainingOop: 500,
+      benefitOverrides: {
+        annualDeductible: 1000,
+        annualOopMax: 500,
+        coinsuranceRate: 0.3,
+      },
+    });
+    if (!result.ok) throw new Error("expected estimate");
+    expect(result.benefits.annualDeductible).toBe(1000);
+    expect(result.benefits.annualOopMax).toBe(500);
+    expect(result.patientPay.low).toBe(114);
+  });
 });
 
 describe("parseOptionalMoney", () => {
@@ -187,6 +223,14 @@ describe("parseOptionalMoney", () => {
     expect(parseOptionalMoney("")).toEqual({});
     expect(parseOptionalMoney("$1,200.50").value).toBe(1200.5);
     expect(parseOptionalMoney("-4").error).toBeTruthy();
+  });
+});
+
+describe("parseOptionalPercent", () => {
+  it("parses percentages and rejects values outside 0–100", () => {
+    expect(parseOptionalPercent("")).toEqual({});
+    expect(parseOptionalPercent("20%").value).toBe(0.2);
+    expect(parseOptionalPercent("101").error).toBeTruthy();
   });
 });
 

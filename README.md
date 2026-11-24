@@ -2,7 +2,7 @@
 
 A welcoming insurance intake prototype. Add insurance cards and plan documents, review extracted details, and save a local plan profile that future care tools can use.
 
-**Student demo: use fictional information only.** This is not a production patient portal. It has no accounts, encrypted application storage, insurer connection, or AI integration.
+**Student demo: use fictional information only.** This is not a production patient portal. It has no accounts or encrypted application storage. The optional cost-search API requires a server-side OpenAI API key.
 
 ## Run it for the first time
 
@@ -22,7 +22,18 @@ npm run dev
 
 Already cloned? Open a terminal in that folder, run `git pull`, then `npm ci` and `npm run dev`. Do not clone inside an existing checkout. If port 5173 is occupied, Vite prints another available port.
 
-For npm cache permission errors, use `npm ci --cache .npm-cache` and add `.npm-cache/` to your local ignore file. No API keys, paid accounts, or database setup are needed.
+For npm cache permission errors, use `npm ci --cache .npm-cache` and add `.npm-cache/` to your local ignore file.
+
+## Enable sourced cost search
+
+Copy `.env.example` to `.env`, then set `OPENAI_API_KEY` to a server-side key:
+
+```sh
+cp .env.example .env
+npm run dev
+```
+
+The web app runs on Vite and proxies `/api/*` to the local Express cost-search API on port 3001. The key is read only by the server and is never sent to the browser. Search uses the OpenAI Responses API with web search and requests a structured JSON result. Missing or ambiguous prices are omitted rather than invented.
 
 ## What works
 

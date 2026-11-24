@@ -19,10 +19,23 @@ export type CostShareRule =
   | { kind: "free"; subjectToDeductible: false }
   | { kind: "copay"; copay: number; subjectToDeductible: boolean }
   | {
+      kind: "copayAndCoinsurance";
+      copay: number;
+      coinsuranceRate: number;
+      subjectToDeductible: boolean;
+    }
+  | {
       kind: "coinsurance";
       coinsuranceRate: number;
       subjectToDeductible: boolean;
     };
+
+export type BenefitOverrides = {
+  annualDeductible?: number;
+  annualOopMax?: number;
+  copay?: number;
+  coinsuranceRate?: number;
+};
 
 export type AllowedRange = {
   p25: number;
@@ -69,6 +82,7 @@ export type EstimateRequest = {
   setting?: CareSetting;
   remainingDeductible?: number;
   remainingOop?: number;
+  benefitOverrides?: BenefitOverrides;
 };
 
 export type ShareBreakdown = {
@@ -98,3 +112,28 @@ export type CostEstimate = {
 export type CostEstimateResult =
   | CostEstimate
   | { ok: false; error: string };
+
+export type ProcedurePrice = {
+  hospitalId: string;
+  procedureCode: string;
+  procedureDescription: string;
+  payer: string;
+  planName: string;
+  network: "in" | "out";
+  grossCharge?: number;
+  cashPrice?: number;
+  negotiatedAmount?: number;
+  setting: "inpatient" | "outpatient";
+  sourceUrl: string;
+  lastUpdated?: string;
+};
+
+export type PlanBenefits = {
+  planId: string;
+  deductibleRemaining: number;
+  coinsuranceRate: number;
+  copay: number;
+  outOfPocketMaximum: number;
+  outOfPocketRemaining: number;
+  network: "in" | "out";
+};
