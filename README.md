@@ -105,3 +105,11 @@ No Gemini or OpenRouter models are connected. Add model calls behind an authenti
 The supplied fictional Aetna card was uploaded through the browser UI. OCR and the details form were checked end to end: insurer `Aetna`, member `Jane Doe`, member ID `W123456789`, GHP/group candidate `000000-000-00000`, and plan `Managed Choice Open Access AMF Aexcel Plus` were prefilled. Unsupported fields stayed blank. Automated regression tests cover that OCR layout, missing values, next-line IDs, and avoiding pharmacy/issuer-number confusion. The source images remain local and are not committed.
 
 This is heuristic extraction, not a guarantee for every insurer or photo quality. Always review suggestions. Existing entered values are preserved; adding a new card does not silently replace them.
+
+## Required benefits follow-up
+
+After **Plan details**, the new **Benefits** step checks uploaded text and asks for annual/remaining deductible, annual/remaining out-of-pocket limits, patient coinsurance, and primary/specialist/emergency copays. Select the network and individual/family scope, enter benefit-period and balance dates, and review each answer. You must provide a value or explicitly select **I don’t know** for every amount. Unknown values can be saved as incomplete but never become zero or estimate-ready data.
+
+The app extracts unambiguous scoped values from uploaded documents and shows source evidence. It does not scrape authenticated insurer portals or infer benefits from a logo/member ID. Use **Add a benefits document** to upload your SBC or retrieve balances from the insurer's member portal. Missing, ambiguous, and conflicting values trigger manual questions. This remains a fictional-data prototype.
+
+`src/features/BenefitsIntake.tsx` renders the questions and summary; `src/lib/benefits.ts` defines validation, evidence and the adapter for the separate estimator branch. See the updated team handoff before merging that integration.

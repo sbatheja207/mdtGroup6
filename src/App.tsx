@@ -1,3 +1,9 @@
+import { BenefitsIntake, BenefitsSummary } from "./features/BenefitsIntake";
+import {
+  emptyBenefits,
+  validateBenefits,
+  missingBenefits,
+} from "./lib/benefits";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -113,6 +119,7 @@ const modules = [
 export default function App() {
   const [page, setPage] = useState<Page>("plan");
   const [step, setStep] = useState(0);
+  const [benefits, setBenefits] = useState(emptyBenefits);
   const [details, setDetails] = useState<PlanDetails>({ ...emptyDetails });
   const [documents, setDocuments] = useState<PlanDocument[]>([]);
   const [profile, setProfile] = useState<PlanProfile>();
@@ -134,6 +141,7 @@ export default function App() {
         if (p) {
           setProfile(p);
           setDetails(p.details);
+          setBenefits(p.benefits ?? emptyBenefits());
           setDocuments(p.documents);
           setEditing(false);
         }
@@ -197,6 +205,7 @@ export default function App() {
     const text =
       "FICTIONAL DEMO — NOT INSURANCE\nInsurer: Example Health (fictional)\nPlan name: Campus Care Plus\nMember name: Alex Morgan\nMember ID: DEMO123456\nGroup number: DEMO006\nPolicy number: DEMO2026\nNo benefits or coverage are represented by this sample.";
     setDetails({ ...demoDetails });
+    setBenefits(emptyBenefits());
     setDocuments([
       {
         id: crypto.randomUUID(),
@@ -214,7 +223,7 @@ export default function App() {
     go(1);
   }
   async function save() {
-    const invalid = validateDetails(details);
+    const invalid = validateDetails(details) || validateBenefits(benefits);
     if (invalid) {
       setError(invalid);
       return;
@@ -235,6 +244,7 @@ export default function App() {
         Object.entries(details).map(([k, v]) => [k, v.trim()]),
       ) as PlanDetails,
       documents,
+      benefits,
       reviewed: true,
       coverageVerified: false,
     };
@@ -257,6 +267,7 @@ export default function App() {
       await deleteProfile();
       setProfile(undefined);
       setDetails({ ...emptyDetails });
+      setBenefits(emptyBenefits());
       setDocuments([]);
       setEditing(true);
       setStep(0);
@@ -426,7 +437,9 @@ export default function App() {
               </p>
               <div className="context-note">
                 {profile
-                  ? `Your reviewed ${profile.details.insurer} profile is ready for the team’s integration.`
+                  ? missingBenefits(profile.benefits).length
+                    ? "Your saved plan still needs benefit information. Complete the benefits step before using it for estimates."
+                    : `Your ${profile.details.insurer} benefit information is recorded for the team’s integration; service-specific checks are still needed.`
                   : "Start by adding your insurance. Your plan profile will provide context for this tool."}
               </div>
               <button className="primary" onClick={() => navigate("plan")}>
@@ -469,6 +482,7 @@ export default function App() {
                   {profile.documents.length} document(s) saved. Details reviewed
                   by you; coverage has not been verified.
                 </div>
+                <BenefitsSummary value={profile.benefits} />
                 <div className="button-row">
                   <button
                     className="secondary"
@@ -494,22 +508,25 @@ export default function App() {
             <div className="intake-layout">
               <section className="panel intake-panel">
                 <ol className="steps" aria-label="Intake progress">
-                  {["Add documents", "Plan details", "Review & save"].map(
-                    (s, i) => (
-                      <li
-                        key={s}
-                        className={
-                          step === i ? "current" : step > i ? "done" : ""
-                        }
-                        aria-current={step === i ? "step" : undefined}
-                      >
-                        <span>
-                          {step > i ? <Check size={14} /> : `0${i + 1}`}
-                        </span>
-                        {s}
-                      </li>
-                    ),
-                  )}
+                  {[
+                    "Add documents",
+                    "Plan details",
+                    "Benefits",
+                    "Review & save",
+                  ].map((s, i) => (
+                    <li
+                      key={s}
+                      className={
+                        step === i ? "current" : step > i ? "done" : ""
+                      }
+                      aria-current={step === i ? "step" : undefined}
+                    >
+                      <span>
+                        {step > i ? <Check size={14} /> : `0${i + 1}`}
+                      </span>
+                      {s}
+                    </li>
+                  ))}
                 </ol>
                 {step === 0 && (
                   <div className="step-content">
@@ -646,14 +663,14 @@ export default function App() {
                       <button
                         className="text-button"
                         disabled={busy}
-                        onClick={() => go(1)}
+                        onClick={() => go(2)}
                       >
                         Enter details manually
                       </button>
                       <button
                         className="primary"
                         disabled={busy}
-                        onClick={() => go(1)}
+                        onClick={() => go(2)}
                       >
                         Continue
                         <ArrowRight size={17} />
@@ -758,13 +775,47 @@ export default function App() {
                         Back
                       </button>
                       <button className="primary" type="submit">
-                        Review details
+                        Continue to benefits
                         <ArrowRight size={17} />
                       </button>
                     </div>
                   </form>
                 )}
                 {step === 2 && (
+                  <form
+                    className="step-content"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const invalid = validateBenefits(benefits);
+                      if (invalid) setError(invalid);
+                      else go(3);
+                    }}
+                  >
+                    <BenefitsIntake
+                      value={benefits}
+                      onChange={setBenefits}
+                      documents={documents}
+                      insurer={details.insurer}
+                      onUpload={() => {
+                        setKind("plan");
+                        go(0);
+                      }}
+                    />
+                    <div className="step-footer">
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() => go(1)}
+                      >
+                        Back to plan details
+                      </button>
+                      <button type="submit" className="primary">
+                        Review plan and benefits
+                      </button>
+                    </div>
+                  </form>
+                )}
+                {step === 3 && (
                   <div className="step-content">
                     <div className="section-heading">
                       <div>
@@ -790,6 +841,7 @@ export default function App() {
                         </div>
                       ))}
                     </div>
+                    <BenefitsSummary value={benefits} />
                     <h3 className="documents-title">
                       Your documents ({documents.length})
                     </h3>
@@ -818,7 +870,7 @@ export default function App() {
                       <button
                         className="text-button"
                         disabled={busy}
-                        onClick={() => go(1)}
+                        onClick={() => go(2)}
                       >
                         <ArrowLeft size={16} />
                         Back
@@ -840,6 +892,7 @@ export default function App() {
                     disabled={busy}
                     onClick={() => {
                       setDetails(profile.details);
+                      setBenefits(profile.benefits ?? emptyBenefits());
                       setDocuments(profile.documents);
                       setEditing(false);
                       setError("");

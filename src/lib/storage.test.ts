@@ -35,3 +35,31 @@ it("persists, updates, and deletes a profile including original document blobs",
   await deleteProfile();
   expect(await loadProfile()).toBeUndefined();
 });
+
+it("keeps benefit evidence and explicit unknown values across reloads", async () => {
+  const { emptyBenefits } = await import("./benefits");
+  const benefits = emptyBenefits();
+  benefits.values.annualDeductible = {
+    value: "1500",
+    unknown: false,
+    source: {
+      documentId: "doc",
+      name: "test.pdf",
+      quote: "Individual in-network deductible: $1500",
+    },
+  };
+  benefits.values.remainingDeductible = { value: "", unknown: true };
+  const profile: PlanProfile = {
+    schemaVersion: 1,
+    id: "benefits-test",
+    updatedAt: new Date().toISOString(),
+    details: demoDetails,
+    documents: [],
+    reviewed: true,
+    coverageVerified: false,
+    benefits,
+  };
+  await saveProfile(profile);
+  expect((await loadProfile())?.benefits).toEqual(benefits);
+  await deleteProfile();
+});

@@ -1,3 +1,4 @@
+import type { PlanBenefits } from "./benefits";
 export type PlanDetails = {
   insurer: string;
   planName: string;
@@ -29,6 +30,7 @@ export type PlanProfile = {
   documents: PlanDocument[];
   reviewed: true;
   coverageVerified: false;
+  benefits?: PlanBenefits; // Additive v1 field: old profiles remain readable.
 };
 export const emptyDetails: PlanDetails = {
   insurer: "",

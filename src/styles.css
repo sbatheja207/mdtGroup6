@@ -2388,3 +2388,222 @@ footer button {
     font-size: 10px;
   }
 }
+
+/* Benefit intake keeps missing information explicit and readable. */
+.benefits-intake {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+.benefits-intake > p {
+  margin: 12px 0 22px;
+  color: #626d54;
+}
+.benefits-intake h2 {
+  font-size: 1.6rem;
+}
+.benefit-status {
+  border: 1px solid #c7d1a3;
+  background: #eef0db;
+  border-radius: 14px;
+  padding: 18px;
+  margin: 20px 0;
+}
+.benefit-status p,
+.benefit-help p {
+  margin: 8px 0;
+  color: #65714f;
+  font-size: 0.95rem;
+}
+.benefit-help {
+  background: #f4f4e8;
+  border-radius: 14px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.benefit-help a {
+  display: inline-block;
+  margin: 12px;
+  color: #465d32;
+  text-decoration: underline;
+}
+.benefit-help .secondary {
+  font-size: 0.95rem;
+}
+.benefits-intake .fields {
+  margin: 24px 0;
+}
+.benefits-intake .fields label,
+.benefits-intake .fields input,
+.benefits-intake .fields select {
+  font-size: 1rem;
+}
+.benefits-intake .fields small {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #6c765a;
+}
+.benefit-field-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.benefit-field {
+  padding: 18px;
+  background: #fbfcf7;
+  border: 1px solid #dce2cf;
+  border-radius: 14px;
+  min-width: 0;
+}
+.benefit-field > label:first-child {
+  font-weight: 600;
+  font-size: 1rem;
+  display: block;
+}
+.benefit-field > p {
+  font-size: 0.9rem;
+  color: #697457;
+  margin: 8px 0 14px;
+}
+.benefit-field > input,
+.benefit-notes textarea {
+  width: 100%;
+  border: 1px solid #bac6a8;
+  border-radius: 9px;
+  padding: 12px;
+  background: #fff;
+  color: #34492b;
+  font: inherit;
+}
+.benefit-field > input:disabled {
+  background: #edefe5;
+}
+.unknown-choice {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  margin: 13px 0 0;
+  line-height: 1.5;
+}
+.unknown-choice input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  accent-color: #51643b;
+}
+.benefit-field details {
+  margin-top: 14px;
+  font-size: 0.85rem;
+  color: #51653d;
+}
+.benefit-field summary {
+  cursor: pointer;
+}
+.benefit-field blockquote {
+  margin: 10px 0;
+  border-left: 3px solid #bcc78d;
+  padding: 8px;
+  overflow-wrap: anywhere;
+  background: #eef1e0;
+}
+.benefit-conflict {
+  font-size: 0.85rem;
+  color: #8d4930;
+  margin-top: 12px;
+}
+.benefit-conflict ul {
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+.benefit-notes {
+  display: block;
+  margin: 22px 0;
+  font-weight: 600;
+}
+.benefit-notes textarea {
+  display: block;
+  min-height: 110px;
+  margin-top: 10px;
+  font-weight: 400;
+}
+.benefits-intake .consent {
+  font-size: 0.95rem;
+}
+.benefits-summary {
+  border-top: 1px solid #d8dfcc;
+  padding-top: 22px;
+  margin-top: 25px;
+  font-size: 0.95rem;
+}
+.benefits-summary h3 {
+  font-size: 1.15rem;
+}
+.benefits-summary p {
+  margin: 10px 0;
+  color: #667553;
+}
+.benefits-summary dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.benefits-summary dt {
+  color: #687956;
+  font-size: 0.9rem;
+}
+.benefits-summary dd {
+  margin: 5px 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.benefits-summary .benefit-incomplete {
+  color: #87542a;
+  background: #f5edd6;
+  padding: 12px;
+  border-radius: 10px;
+}
+.benefits-summary .benefit-complete {
+  background: #e9efda;
+  padding: 12px;
+  border-radius: 10px;
+}
+.steps {
+  flex-wrap: wrap;
+}
+.steps li {
+  font-size: 0.9rem;
+}
+.steps li > span {
+  font-size: 0.8rem;
+}
+.benefits-intake ~ .step-footer .primary {
+  font-size: 0.95rem;
+}
+.error {
+  font-size: 1rem;
+}
+@media (max-width: 680px) {
+  .benefit-field-list {
+    grid-template-columns: 1fr;
+  }
+  .benefits-intake .fields {
+    grid-template-columns: 1fr;
+  }
+  .benefits-summary dl {
+    grid-template-columns: 1fr;
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .benefits-intake ~ .step-footer {
+    flex-wrap: wrap;
+  }
+  .benefit-help a {
+    margin-left: 0;
+  }
+  .benefit-field {
+    padding: 16px;
+  }
+}
