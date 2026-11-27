@@ -2607,3 +2607,201 @@ footer button {
     padding: 16px;
   }
 }
+
+.cost-layout {
+  display: grid;
+  gap: 18px;
+}
+.cost-panel {
+  padding: 30px;
+}
+.cost-form .error {
+  margin-top: 18px;
+  margin-bottom: 0;
+}
+.cost-span-2 {
+  grid-column: 1 / -1;
+}
+.cost-suggestions {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+.cost-suggestion {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #dfe4d4;
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #365342;
+  min-height: 54px;
+}
+.cost-suggestion strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.cost-suggestion span {
+  font-size: 10px;
+  color: #7b8b72;
+}
+.cost-suggestion.active {
+  border-color: #255e4d;
+  background: #f4f7ef;
+}
+.cost-empty {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #7b8b72;
+  padding: 8px 2px;
+}
+.cost-breakdown {
+  margin-top: 8px;
+}
+.cost-template {
+  margin-top: 22px;
+  font-size: 12px;
+  color: #5f6f5c;
+}
+.cost-benefit-note {
+  margin-top: 16px;
+  line-height: 1.6;
+}
+.cost-benefit-note ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.cost-disclaimer {
+  margin-top: 16px;
+}
+.cost-assumptions {
+  margin: 16px 0 0;
+  padding-left: 18px;
+  color: #6d7b66;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.cost-panel .section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+.hospital-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+.hospital-card {
+  border: 1px solid #dfe6da;
+  border-radius: 9px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.hospital-card h3 {
+  margin-top: 6px;
+  font-size: 14px;
+}
+.hospital-card p {
+  color: #879680;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.hospital-network {
+  color: #6d8662;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.hospital-price {
+  color: #255e4d;
+  font-size: 20px;
+  font-family: "Manrope", sans-serif;
+  overflow-wrap: anywhere;
+}
+.hospital-price-label,
+.hospital-estimate span {
+  color: #879680;
+  font-size: 10px;
+}
+.hospital-estimate {
+  border-radius: 8px;
+  background: #edf3e8;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+.hospital-estimate strong {
+  color: #255e4d;
+  font-size: 18px;
+}
+.hospital-estimate small {
+  color: #6d7b66;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.hospital-estimate-note {
+  border-radius: 8px;
+  background: #f4f5ec;
+  padding: 10px 12px;
+  color: #7b866f !important;
+  line-height: 1.5;
+}
+.hospital-card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  font-size: 10px;
+}
+.hospital-card dt {
+  color: #879680;
+}
+.hospital-card dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+.hospital-card a {
+  color: #356c50;
+  font-size: 11px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .cost-suggestions,
+  .hospital-results {
+    grid-template-columns: 1fr;
+  }
+  .cost-panel {
+    padding: 22px 18px;
+  }
+  .cost-panel .section-heading {
+    flex-direction: column;
+  }
+  .cost-form .fields {
+    grid-template-columns: 1fr;
+  }
+  .cost-span-2 {
+    grid-column: auto;
+  }
+  .cost-form .step-footer {
+    align-items: stretch;
+  }
+  .cost-form .step-footer .primary {
+    margin-left: auto;
+  }
+}
