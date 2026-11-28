@@ -71,6 +71,21 @@ describe("benefit discovery and required follow-up", () => {
       expect(result.benefitOverrides.coinsuranceRate).toBe(0.2);
     }
   });
+  it("allows reviewed individual out-of-network benefits for an illustrative estimate", () => {
+    const b = complete();
+    b.network = "out";
+    const result = getEstimateInputs(b);
+    expect(result.ready).toBe(true);
+    if (result.ready) expect(result.network).toBe("out");
+  });
+  it("still blocks family benefits from the individual estimator", () => {
+    const b = complete();
+    b.scope = "family";
+    const result = getEstimateInputs(b);
+    expect(result.ready).toBe(false);
+    if (!result.ready)
+      expect(result.missing[0]).toContain("requires individual benefits");
+  });
   it("does not mix in-network, out-of-network, individual or family limits", () => {
     const b = emptyBenefits();
     b.scope = "individual";

@@ -2,7 +2,7 @@
 
 A welcoming insurance intake prototype. Add insurance cards and plan documents, review extracted details, and save a local plan profile that future care tools can use.
 
-**Student demo: use fictional information only.** This is not a production patient portal. It has no accounts or encrypted application storage. The optional cost-search API requires a server-side OpenAI API key.
+**Student demo: use fictional information only.** This is not a production patient portal. It has no accounts or encrypted application storage. The optional cost-search API requires a server-side PayerPrice API key.
 
 ## Run it for the first time
 
@@ -26,14 +26,14 @@ For npm cache permission errors, use `npm ci --cache .npm-cache` and add `.npm-c
 
 ## Enable sourced cost search
 
-Copy `.env.example` to `.env`, then set `OPENAI_API_KEY` to a server-side key:
+Copy `.env.example` to `.env`, then set `PAYERPRICE_API_KEY` to a server-side key:
 
 ```sh
 cp .env.example .env
 npm run dev
 ```
 
-The web app runs on Vite and proxies `/api/*` to the local Express cost-search API on port 3001. The key is read only by the server and is never sent to the browser. Search uses the OpenAI Responses API with web search and requests a structured JSON result. Missing or ambiguous prices are omitted rather than invented.
+The web app runs on Vite and proxies `/api/*` to the local Express cost-search API on port 3001. The key is read only by the server and is never sent to the browser. The server searches hospitals by city or city/state with PayerPrice, then requests published rates for the selected CPT code and payer. Each search can use multiple API calls and organization API credits. ZIP-code searches are not supported by this facility-search flow.
 
 ## What works
 
@@ -44,7 +44,7 @@ The web app runs on Vite and proxies `/api/*` to the local Express cost-search A
 - Conservative suggestions for member ID (including bare `ID` and spaced values), group/policy number, recognized insurer names, plan name, and next-line member names. Suggested fields are marked in the form. GHP is treated as a group-number candidate and must be checked against the plan. For multiple members, the first name is suggested and must be reviewed. Blank fields stay blank when no match exists. Suggestions only fill blank fields and must be reviewed. Removing a document does not erase previously suggested fields; correct them on the details step.
 - Manual entry for insurer, plan name, name on card, member ID, group/policy number, plan type, network, and coverage dates. Insurer and member ID are required; group and policy number are optional because not every plan supplies them.
 - IndexedDB persistence of one reviewed profile, original file blobs, and extracted text. Edit, reload, and delete are supported. Unsaved changes are held in memory and lost on reload.
-- Cost estimator searches publicly available hospital pricing through the optional server-side OpenAI web-search API. The local procedure list contains only procedure names and CPT codes, not prices or benefit templates. Patient responsibility uses reviewed benefits saved in My Insurance and is calculated only from a sourced negotiated rate, an explicit exact-plan/in-network match, complete individual in-network benefits, and a matching saved copay category; no demo price is substituted when search fails.
+- Cost estimator searches hospital-published prices through the optional server-side PayerPrice API. The local procedure list contains only procedure names and CPT codes, not prices or benefit templates. An illustrative patient-responsibility calculation uses a sourced rate, an exact plan-name match, complete reviewed individual benefits for the selected network tier (in or out), and a matching saved copay category. Provider network status and the insurer's allowed amount are not verified; out-of-network billing and plan rules may make actual costs different. Family benefits are not supported.
 - Clearly labeled future modules for chat and bill review.
 
 ## Test and build

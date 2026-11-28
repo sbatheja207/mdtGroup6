@@ -234,19 +234,20 @@ export function missingBenefits(b?: PlanBenefits): string[] {
   return problems;
 }
 // Adapter for the cost-estimation branch. Rates are fractions there (20% -> .2).
-// Does not select service rules, assume network eligibility, or invent missing values.
+// Uses only reviewed individual benefit values for the selected network tier.
 export function getEstimateInputs(b?: PlanBenefits) {
   const missing = missingBenefits(b);
   if (!b || missing.length) return { ready: false as const, missing };
-  if (b.scope !== "individual" || b.network !== "in")
+  if (b.scope !== "individual")
     return {
       ready: false as const,
       missing: [
-        "The current estimator requires individual in-network benefits; family aggregation/out-of-network rules need a separate calculation.",
+        "The current estimator requires individual benefits; family aggregation needs a separate calculation.",
       ],
     };
   return {
     ready: true as const,
+    network: b.network,
     remainingDeductible: Number(b.values.remainingDeductible.value),
     remainingOop: Number(b.values.remainingOop.value),
     benefitOverrides: {

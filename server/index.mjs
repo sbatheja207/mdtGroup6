@@ -3,221 +3,320 @@ import express from "express";
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5-mini";
+const PAYERPRICE_API_KEY = process.env.PAYERPRICE_API_KEY;
+const PAYERPRICE_API_URL = "https://api.payerprice.com";
+const MAX_HOSPITALS = 10;
 
-function cleanJson(text) {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  return JSON.parse(fenced ? fenced[1] : trimmed);
+const supportedPayers = [
+  "BCBS",
+  "United",
+  "Aetna",
+  "Cigna",
+  "FirstHealth",
+  "BannerHealth",
+  "MeritainHealth",
+  "Centene",
+  "Fidelis",
+  "Ambetter",
+  "QualChoice",
+  "HealthNet",
+  "ManagedHealthNetwork",
+  "WellCare",
+  "DeanHealthPlan",
+  "Prevea360",
+  "TripleSSalud",
+  "AlliantHealthPlans",
+  "AmeriHealth",
+  "AveraHealthPlans",
+  "BaylorScottWhiteHealthPlan",
+  "CareSource",
+  "CommunityCareOklahoma",
+  "PriorityHealth",
+  "TuftsHealthPlan",
+  "MVPHealthCare",
+  "HarvardPilgrimHealthCare",
+  "HealthAlliance",
+  "HealthAllianceHAP",
+  "HealthFirst",
+  "HealthLink",
+  "HealthNewEngland",
+  "HealthPartners",
+  "HealthSmart",
+  "HometownHealth",
+  "IndependentHealthAssociation",
+  "InterWestHealth",
+  "JohnsHopkinsHealthPlans",
+  "KaiserPermanente",
+  "LyraHealth",
+  "LuminareHealth",
+  "MagnaCare",
+  "MassGeneralBrigham",
+  "Medica",
+  "MedicalMutual",
+  "MidlandsChoice",
+  "ModaHealth",
+  "Molina",
+  "MultiPlan",
+  "NeighborhoodHealthPlanOfRhodeIsland",
+  "OSUHealthPlan",
+  "OptimaHealth",
+  "Oscar",
+  "PacificSource",
+  "PhysiciansHealthPlan",
+  "PresbyterianHealthPlan",
+  "ProvidenceHealthPlan",
+  "Quartz",
+  "SanfordHealthPlan",
+  "SelectHealth",
+  "TexasChildrensHealthPlan",
+  "TheAlliance",
+  "TrilogyHealthSolutions",
+  "UCare",
+  "UHAHealthInsurance",
+  "UPMCHealthPlan",
+];
+
+const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function resolvePayer(value) {
+  const normalized = normalize(value);
+  if (
+    normalized.includes("bluecross") &&
+    normalized.includes("blueshield")
+  ) {
+    return "BCBS";
+  }
+  if (
+    normalized === "uhc" ||
+    normalized === "unitedhealthcare" ||
+    normalized === "unitedhealthcareinsurance"
+  ) {
+    return "United";
+  }
+  return supportedPayers.find((payer) => normalize(payer) === normalized);
+}
+
+async function payerPriceRequest(path, body) {
+  const response = await fetch(`${PAYERPRICE_API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${PAYERPRICE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error("PayerPrice returned an unreadable response.");
+  }
+
+  if (!response.ok) {
+    const messages = {
+      401: "PayerPrice rejected the API key. Check PAYERPRICE_API_KEY.",
+      402: "PayerPrice API credit is insufficient.",
+      403: "Your PayerPrice organization does not have access to this endpoint.",
+      429: "PayerPrice rate limit reached. Wait before searching again.",
+    };
+    const message =
+      messages[response.status] ||
+      (typeof payload?.error === "string" ? payload.error : null) ||
+      "PayerPrice could not complete the pricing search.";
+    throw new Error(message);
+  }
+  return payload;
+}
+
+function amountOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
+function toHospitalResult(rate, facility, requestedPayer, requestedPlan) {
+  const plans = Array.isArray(rate.plan)
+    ? rate.plan.filter((plan) => typeof plan === "string")
+    : [];
+  const reportedPayer =
+    typeof rate.payer === "string" ? rate.payer : requestedPayer;
+  const samePayer = normalize(reportedPayer) === normalize(requestedPayer);
+  const exactPlan =
+    samePayer &&
+    requestedPlan.trim() !== "" &&
+    plans.some((plan) => normalize(plan) === normalize(requestedPlan));
+  const setting = ["inpatient", "outpatient", "both"].includes(rate.setting)
+    ? rate.setting
+    : "unknown";
+
+  return {
+    hospitalId: [
+      rate.ccn,
+      rate.billingCode,
+      reportedPayer,
+      plans.join(","),
+      rate.year,
+      rate.month,
+      rate.setting || "",
+      rate.billingClass || "",
+      rate.methodology || "",
+    ].join("-"),
+    hospitalName:
+      typeof rate.hospitalName === "string" && rate.hospitalName
+        ? rate.hospitalName
+        : facility.name,
+    location: [facility.city, facility.state].filter(Boolean).join(", "),
+    procedureCode: rate.billingCode,
+    procedureDescription:
+      typeof rate.description === "string" && rate.description
+        ? rate.description
+        : rate.billingCode,
+    payer: reportedPayer,
+    planName: plans.length ? plans.join(", ") : "Plan not listed",
+    planMatch: exactPlan ? "exact" : samePayer ? "payer_only" : "unclear",
+    network: "unknown",
+    grossCharge: amountOrNull(rate.standardChargeGross),
+    cashPrice: amountOrNull(rate.standardChargeDiscountedCash),
+    negotiatedAmount: amountOrNull(rate.negotiatedDollar),
+    setting,
+    sourceUrl: null,
+    filePeriod:
+      Number.isInteger(rate.year) && Number.isInteger(rate.month)
+        ? `${rate.year}-${String(rate.month).padStart(2, "0")}`
+        : null,
+  };
 }
 
 app.post("/api/cost-search", async (req, res) => {
-  if (!OPENAI_API_KEY) {
+  if (!PAYERPRICE_API_KEY) {
     res.status(503).json({
-      error: "LLM search is not configured. Set OPENAI_API_KEY on the server.",
+      error:
+        "PayerPrice search is not configured. Set PAYERPRICE_API_KEY on the server.",
     });
     return;
   }
 
-  const {
-    procedureName,
-    cptCode,
-    location,
-    payer,
-    planName,
-    planType,
-  } = req.body ?? {};
+  const { procedureName, cptCode, location, payer, planName = "" } =
+    req.body ?? {};
 
-  if (!procedureName || !location) {
+  if (!procedureName || !cptCode || !location || !payer) {
     res.status(400).json({
-      error: "Procedure and location are required.",
+      error: "Procedure, CPT code, location, and insurer are required.",
+    });
+    return;
+  }
+  if (/^\d{5}$/.test(String(location).trim())) {
+    res.status(400).json({
+      error:
+        "PayerPrice facility search supports city names, not ZIP codes. Enter a city or city and state.",
     });
     return;
   }
 
-  const prompt = `Find publicly available, procedure-specific hospital negotiated prices for:
-- Procedure: ${procedureName}${cptCode ? ` (CPT/HCPCS ${cptCode})` : ""}
-- Location: ${location}
-- Payer: ${payer || "not provided"}
-- Plan: ${planName || "not provided"}
-- Plan type: ${planType || "not provided"}
-
-Search hospital websites and Machine-Readable Files (MRFs). Match the exact payer and plan only when evidence clearly supports it.
-
-Return only JSON matching the supplied schema.
-Do not invent hospital names, prices, plan matches, or source URLs.
-Only include an explicitly published price when it has an identifiable source URL.
-Set planMatch to "exact" only when the source explicitly supports this payer and specific plan, "payer_only" when it supports only the payer, and "unclear" otherwise. Do not copy the requested plan name into a result to imply a match.
-Set network to "in" or "out" only for explicit evidence; otherwise use "unknown".
-Only return results for the requested procedure code when one was supplied.
-If no reliable price is available, return an empty hospitals array.
-Include grossCharge and cashPrice only when explicitly found.
-Use null for unavailable optional values.`;
+  const payerId = resolvePayer(String(payer));
+  if (!payerId) {
+    res.status(400).json({
+      error: `PayerPrice does not list a supported payer matching "${payer}".`,
+    });
+    return;
+  }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        tools: [{ type: "web_search_preview" }],
-        input: prompt,
-        text: {
-          format: {
-            type: "json_schema",
-            name: "hospital_cost_search",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                hospitals: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                      hospitalId: { type: "string" },
-                      hospitalName: { type: "string" },
-                      location: { type: "string" },
-                      procedureCode: { type: "string" },
-                      procedureDescription: { type: "string" },
-                      payer: { type: "string" },
-                      planName: { type: "string" },
-                      planMatch: {
-                        type: "string",
-                        enum: ["exact", "payer_only", "unclear"],
-                      },
-                      network: {
-                        type: "string",
-                        enum: ["in", "out", "unknown"],
-                      },
-                      grossCharge: { type: ["number", "null"] },
-                      cashPrice: { type: ["number", "null"] },
-                      negotiatedAmount: { type: ["number", "null"] },
-                      setting: {
-                        type: "string",
-                        enum: ["inpatient", "outpatient"],
-                      },
-                      sourceUrl: { type: "string" },
-                      lastUpdated: { type: ["string", "null"] },
-                    },
-                    required: [
-                      "hospitalId",
-                      "hospitalName",
-                      "location",
-                      "procedureCode",
-                      "procedureDescription",
-                      "payer",
-                      "planName",
-                      "planMatch",
-                      "network",
-                      "grossCharge",
-                      "cashPrice",
-                      "negotiatedAmount",
-                      "setting",
-                      "sourceUrl",
-                      "lastUpdated",
-                    ],
-                  },
-                },
-                summary: { type: "string" },
-              },
-              required: ["hospitals", "summary"],
-            },
-          },
+    const locationParts = String(location)
+      .trim()
+      .match(/^(.*?),\s*([A-Za-z]{2})$/);
+    const cityOrSearch = locationParts ? locationParts[1].trim() : String(location).trim();
+    if (!cityOrSearch) {
+      res.status(400).json({ error: "Enter a city name to search." });
+      return;
+    }
+    const facilitySearch = await payerPriceRequest("/api/v1/ccnSearch", {
+      searchTerms: [cityOrSearch.slice(0, 40)],
+      facilityTypes: ["HOSPITAL"],
+      ...(locationParts ? { states: [locationParts[2].toUpperCase()] } : {}),
+      limit: MAX_HOSPITALS,
+    });
+
+    if (!Array.isArray(facilitySearch)) {
+      throw new Error("PayerPrice returned an invalid facility search result.");
+    }
+
+    const facilities = facilitySearch
+      .filter(
+        (facility) =>
+          facility &&
+          typeof facility.ccn === "string" &&
+          typeof facility.name === "string" &&
+          typeof facility.city === "string" &&
+          typeof facility.state === "string",
+      )
+      .filter(
+        (facility, index, list) =>
+          list.findIndex((entry) => entry.ccn === facility.ccn) === index,
+      )
+      .slice(0, MAX_HOSPITALS);
+
+    const rateResults = [];
+    for (let index = 0; index < facilities.length; index += 2) {
+      const batch = facilities.slice(index, index + 2);
+      const rates = await payerPriceRequest(
+        "/api/v1/hospital/provider/rates",
+        {
+          providers: { ccns: batch.map((facility) => facility.ccn) },
+          payers: [payerId],
+          billingCodeAndTypes: [{ code: String(cptCode), type: "CPT" }],
+          limit: 1000,
         },
-      }),
-    });
-
-    const payload = await response.json();
-    if (!response.ok) {
-      console.error("OpenAI Responses API error", payload);
-      res.status(502).json({
-        error: payload.error?.message || "The LLM pricing search failed.",
-      });
-      return;
-    }
-
-    const outputText =
-      payload.output_text ||
-      payload.output
-        ?.flatMap((item) => item.content || [])
-        ?.map((item) => item.text)
-        ?.filter(Boolean)
-        ?.join("\n");
-
-    if (!outputText) {
-      res.status(502).json({ error: "The search returned no structured result." });
-      return;
-    }
-
-    let data;
-    try {
-      data = cleanJson(outputText);
-    } catch {
-      res.status(502).json({
-        error: "The LLM returned invalid structured pricing data.",
-      });
-      return;
-    }
-
-    if (!Array.isArray(data.hospitals)) {
-      res.status(502).json({
-        error: "The LLM returned an unexpected pricing result.",
-      });
-      return;
-    }
-
-    const hospitals = data.hospitals.filter((hospital) => {
-      if (
-        !hospital ||
-        typeof hospital.hospitalName !== "string" ||
-        typeof hospital.location !== "string" ||
-        typeof hospital.procedureCode !== "string" ||
-        typeof hospital.procedureDescription !== "string" ||
-        typeof hospital.payer !== "string" ||
-        typeof hospital.planName !== "string" ||
-        !["exact", "payer_only", "unclear"].includes(hospital.planMatch) ||
-        !["in", "out", "unknown"].includes(hospital.network) ||
-        typeof hospital.sourceUrl !== "string" ||
-        !/^https?:\/\//i.test(hospital.sourceUrl) ||
-        !["inpatient", "outpatient"].includes(hospital.setting)
-      ) {
-        return false;
+      );
+      if (!rates || !Array.isArray(rates.data)) {
+        throw new Error("PayerPrice returned invalid hospital rate data.");
       }
+      for (const rate of rates.data) {
+        if (
+          !rate ||
+          typeof rate !== "object" ||
+          typeof rate.ccn !== "string" ||
+          typeof rate.billingCode !== "string"
+        ) {
+          throw new Error("PayerPrice returned an invalid hospital rate record.");
+        }
+        const facility = batch.find((entry) => entry.ccn === rate.ccn);
+        if (
+          facility &&
+          rate.billingCode === String(cptCode) &&
+          rate.billingCodeType === "CPT"
+        ) {
+          rateResults.push(
+            toHospitalResult(rate, facility, payerId, String(planName)),
+          );
+        }
+      }
+    }
 
-      if (cptCode && hospital.procedureCode !== cptCode) return false;
-      if (hospital.grossCharge !== null &&
-        (typeof hospital.grossCharge !== "number" ||
-          !Number.isFinite(hospital.grossCharge) ||
-          hospital.grossCharge < 0)) return false;
-      if (hospital.cashPrice !== null &&
-        (typeof hospital.cashPrice !== "number" ||
-          !Number.isFinite(hospital.cashPrice) ||
-          hospital.cashPrice < 0)) return false;
-      if (hospital.negotiatedAmount !== null &&
-        (typeof hospital.negotiatedAmount !== "number" ||
-          !Number.isFinite(hospital.negotiatedAmount) ||
-          hospital.negotiatedAmount < 0)) return false;
-      return true;
-    });
+    const diagnostics = {
+      facilitiesFound: facilities.length,
+      rateRecordsFound: rateResults.length,
+      facilityLimit: MAX_HOSPITALS,
+    };
+    console.info("PayerPrice search diagnostics", diagnostics);
 
     res.json({
-      hospitals,
-      summary:
-        typeof data.summary === "string"
-          ? data.summary
-          : "No reliable hospital pricing summary was returned.",
+      hospitals: rateResults,
+      diagnostics,
+      summary: facilities.length
+        ? rateResults.length
+          ? "Pricing data is from PayerPrice hospital-published price transparency files. Exact plan and network status are shown only when supported by the returned data."
+          : `PayerPrice found ${facilities.length} hospitals near the requested location, but no rate records for this payer and CPT code.`
+        : "PayerPrice found no hospitals matching the requested location.",
     });
   } catch (error) {
-    console.error("Cost search failed", error);
+    console.error("PayerPrice cost search failed", error);
     res.status(502).json({
-      error: "Could not complete the hospital pricing search.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not complete the PayerPrice hospital search.",
     });
   }
 });

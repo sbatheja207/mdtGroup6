@@ -24,9 +24,9 @@ type HospitalSearchResult = {
   grossCharge: number | null;
   cashPrice: number | null;
   negotiatedAmount: number | null;
-  setting: "inpatient" | "outpatient";
-  sourceUrl: string;
-  lastUpdated: string | null;
+  setting: "inpatient" | "outpatient" | "both" | "unknown";
+  sourceUrl: string | null;
+  filePeriod: string | null;
 };
 
 const money = (amount: number) =>
@@ -51,10 +51,13 @@ function isHospitalSearchResult(value: unknown): value is HospitalSearchResult {
         hospital.negotiatedAmount >= 0)) &&
     (hospital.grossCharge === null || typeof hospital.grossCharge === "number") &&
     (hospital.cashPrice === null || typeof hospital.cashPrice === "number") &&
-    ["inpatient", "outpatient"].includes(String(hospital.setting)) &&
-    typeof hospital.sourceUrl === "string" &&
-    /^https?:\/\//i.test(hospital.sourceUrl) &&
-    (hospital.lastUpdated === null || typeof hospital.lastUpdated === "string")
+    ["inpatient", "outpatient", "both", "unknown"].includes(
+      String(hospital.setting),
+    ) &&
+    (hospital.sourceUrl === null ||
+      (typeof hospital.sourceUrl === "string" &&
+        /^https?:\/\//i.test(hospital.sourceUrl))) &&
+    (hospital.filePeriod === null || typeof hospital.filePeriod === "string")
   );
 }
 
@@ -124,7 +127,7 @@ function CostEstimatorForm({
       return;
     }
     if (!location.trim()) {
-      setSearchError("Enter a city or ZIP code to search hospital prices.");
+      setSearchError("Enter a city or city/state to search hospital prices.");
       return;
     }
 
@@ -139,7 +142,6 @@ function CostEstimatorForm({
           location: location.trim(),
           payer: profile.details.insurer,
           planName: profile.details.planName,
-          planType: profile.details.planType,
         }),
       });
       const payload: unknown = await response.json();
@@ -164,11 +166,13 @@ function CostEstimatorForm({
       }
       setHospitals(payload.hospitals);
       setSearchSummary(
-        "Prices below are sourced from public hospital pricing information. They are not quotes or verified benefits.",
+        "summary" in payload && typeof payload.summary === "string"
+          ? payload.summary
+          : "Pricing data is from PayerPrice hospital-published price transparency files.",
       );
       if (payload.hospitals.length === 0) {
         setSearchError(
-          "No reliable, procedure-specific hospital negotiated rates were found. No price estimate was generated.",
+          "No hospital rate records were returned for this search.",
         );
       }
     } catch (caught) {
@@ -186,8 +190,7 @@ function CostEstimatorForm({
     if (
       !benefits ||
       hospital.negotiatedAmount === null ||
-      hospital.planMatch !== "exact" ||
-      hospital.network !== "in"
+      hospital.planMatch !== "exact"
     ) {
       return undefined;
     }
@@ -263,15 +266,17 @@ function CostEstimatorForm({
                   setLocation(event.target.value);
                   setHospitals([]);
                 }}
-                placeholder="City or ZIP, e.g. Pittsburgh or 10001"
+                placeholder="City or city/state, e.g. Pittsburgh, PA"
               />
-              <small>Used to search for hospitals and their published rates.</small>
+              <small>
+                PayerPrice searches by city; ZIP-code searches are not supported.
+              </small>
             </label>
           </div>
           <div className="context-note cost-benefit-note">
             Patient responsibility uses the reviewed benefits saved in My
             Insurance. It is calculated only when those benefits are complete,
-            individual in-network, and include a copay category that matches
+            individual, and include a copay category that matches
             the selected procedure.
           </div>
           <BenefitsSummary value={profile.benefits} />
@@ -352,12 +357,24 @@ function CostEstimatorForm({
                     )}
                     {estimate ? (
                       <div className="hospital-estimate">
-                        <span>Estimated patient responsibility</span>
+                        <span>Illustrative patient responsibility</span>
                         <strong>{money(estimate.patientPay)}</strong>
                         <small>
                           Deductible {money(estimate.deductible)} · Copay{" "}
                           {money(estimate.copay)} · Coinsurance{" "}
                           {money(estimate.coinsurance)}
+                        </small>
+                        <small>
+                          Uses your saved individual{" "}
+                          {estimateInputs.ready
+                            ? estimateInputs.network === "in"
+                              ? "in-network"
+                              : "out-of-network"
+                            : "selected-network"}{" "}
+                          benefit values. This result does not verify the
+                          hospital&apos;s network status or the insurer&apos;s
+                          allowed amount; out-of-network billing and plan rules
+                          may make your actual cost different.
                         </small>
                       </div>
                     ) : (
@@ -366,15 +383,13 @@ function CostEstimatorForm({
                           ? "A patient estimate is unavailable without a sourced negotiated rate."
                           : hospital.planMatch !== "exact"
                             ? "A patient estimate is unavailable because the exact plan match is not supported."
-                            : hospital.network !== "in"
-                              ? "A patient estimate is unavailable because in-network status is not confirmed."
-                              : !estimateInputs.ready
-                                ? "Complete the saved benefits in My Insurance before calculating patient responsibility."
-                                : !selected?.copayCategory
-                                  ? "No matching service-specific copay is saved for this procedure, so no patient estimate was generated."
-                                  : benefits
-                                    ? "No patient estimate was calculated for this rate."
-                                    : "Saved benefits are unavailable for this estimate."}
+                            : !estimateInputs.ready
+                              ? "Complete reviewed individual benefits in My Insurance before calculating patient responsibility."
+                              : !selected?.copayCategory
+                                ? "No matching service-specific copay is saved for this procedure, so no patient estimate was generated."
+                                : benefits
+                                  ? "No patient estimate was calculated for this rate."
+                                  : "Saved benefits are unavailable for this estimate."}
                       </p>
                     )}
                     <dl>
@@ -392,25 +407,36 @@ function CostEstimatorForm({
                       )}
                       <dt>Setting</dt>
                       <dd>{hospital.setting}</dd>
-                      {hospital.lastUpdated && (
+                      {hospital.filePeriod && (
                         <>
-                          <dt>Last updated</dt>
-                          <dd>{hospital.lastUpdated}</dd>
+                          <dt>File period</dt>
+                          <dd>{hospital.filePeriod}</dd>
                         </>
                       )}
                     </dl>
-                    <a href={hospital.sourceUrl} target="_blank" rel="noreferrer">
-                      View pricing source
-                    </a>
+                    {hospital.sourceUrl ? (
+                      <a
+                        href={hospital.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View pricing source
+                      </a>
+                    ) : (
+                      <span>
+                        Source: PayerPrice hospital price transparency data
+                      </span>
+                    )}
                   </article>
                 );
               })}
             </div>
           )}
           <div className="context-note cost-disclaimer">
-            Estimates are informational only, not a quote, prior authorization,
-            or explanation of benefits. Actual responsibility depends on plan
-            rules, claim adjudication, and other services billed.
+            Calculations are illustrative only, not a quote, prior
+            authorization, or explanation of benefits. Hospital network status
+            and the insurer&apos;s allowed amount are not verified; out-of-network
+            billing and plan rules can change actual costs.
           </div>
         </section>
       )}
